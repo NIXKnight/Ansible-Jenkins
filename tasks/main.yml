@@ -1,2 +1,96 @@
 ---
 # tasks file for Ansible-Jenkins
+- name: Install Jenkins Prerequisite Packages
+  apt:
+    pkg: "{{ item }}"
+    update_cache: yes
+    state: present
+  with_items:
+    - "{{ PREREQUISITE_PACKAGES }}"
+
+- name: Add Jenkins Repository Key
+  apt_key:
+    url: "{{ JENKINS_REPO.KEY }}"
+    state: present
+
+- name: Add Jenkins Repository
+  template:
+    src: "templates/etc/apt/sources.list.d/jenkins.list.j2"
+    dest: "/etc/apt/sources.list.d/jenkins.list"
+
+- name: Install Jenkins
+  apt:
+    pkg: "jenkins"
+    update_cache: yes
+    state: present
+
+- name: Get Jenkins admin Password
+  slurp:
+    src: "{{ jenkins_admin_password_file }}"
+  register: jenkins_admin_password
+
+- name: Replace {{ JENKINS_DEFAULTS_FILE }}
+  template:
+    src: "templates/jenkins_defaults.j2"
+    dest: "{{ jenkins_defaults_file }}"
+
+- name: Create Jenkins Init Directory
+  file:
+    path: "{{ jenkins_init_dir }}"
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: 0755
+
+- name: Copy Jenkins Initialization Script
+  copy:
+    src: "files/disable_setup_wizard.groovy"
+    dest: "{{ jenkins_init_dir }}/disable_setup_wizard.groovy"
+    owner: jenkins
+    group: jenkins
+
+- name: Restart Jenkins
+  systemd:
+    name: jenkins
+    state: restarted
+
+- name: Remove Jenkins Init Directory
+  file:
+    path: "{{ {{ jenkins_defaults_file }} }}"
+    state: absent
+
+- name: Wait For Jenkins Startup
+  wait_for:
+    timeout: 10
+  delegate_to: localhost
+
+- name: Debug
+  debug:
+    var: jenkins_admin_password_file
+
+- name: Set Jenkins URL to {{ JENKINS_URL }}
+  jenkins_script:
+    user: "admin"
+    password: "{{ jenkins_admin_password_file.content | b64decode | trim }}"
+    script: |
+      import jenkins.model.Jenkins
+      import jenkins.model.JenkinsLocationConfiguration
+      def jenkinsParameters = [ email: 'Jenkins Admin <{{ JENKINS_ADMIN_EMAIL }}>', url: '{{ JENKINS_URL }}' ]
+      def jenkinsLocationConfiguration = JenkinsLocationConfiguration.get()
+      jenkinsLocationConfiguration.setUrl(jenkinsParameters.url)
+      jenkinsLocationConfiguration.setAdminAddress(jenkinsParameters.email)
+      jenkinsLocationConfiguration.save()
+
+- name: Create Jenkins Users
+  jenkins_script:
+    user: "admin"
+    password: "{{ jenkins_admin_password_file.content | b64decode | trim }}"
+    script: |
+      import jenkins.model.*
+      import hudson.security.*
+      def instance = Jenkins.getInstance()
+      def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+      hudsonRealm.createAccount("{{ item.username }}","{{ item.password }}")
+      instance.setSecurityRealm(hudsonRealm)
+      instance.save()
+  with_items: "{{ JENKINS_USERS }}"

@@ -1,2 +1,8 @@
 ---
 # vars file for Ansible-Jenkins
+jenkins_user: "jenkins"
+jenkins_group: "jenkins_user"
+jenkins_home: "/var/lib/jenkins"
+jenkins_init_dir: "{{ jenkins_home }}/init.groovy.d"
+jenkins_admin_password_file: "{{ jenkins_home }}/secrets/initialAdminPassword"
+jenkins_defaults_file: "/etc/default/jenkins"
