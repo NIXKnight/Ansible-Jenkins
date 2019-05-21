@@ -64,14 +64,10 @@
     timeout: 10
   delegate_to: localhost
 
-- name: Debug
-  debug:
-    var: jenkins_admin_password_file
-
 - name: Set Jenkins URL to {{ JENKINS_URL }}
   jenkins_script:
     user: "admin"
-    password: "{{ jenkins_admin_password_file.content | b64decode | trim }}"
+    password: "{{ jenkins_admin_password.content | b64decode | trim }}"
     script: |
       import jenkins.model.Jenkins
       import jenkins.model.JenkinsLocationConfiguration
@@ -84,7 +80,7 @@
 - name: Create Jenkins Users
   jenkins_script:
     user: "admin"
-    password: "{{ jenkins_admin_password_file.content | b64decode | trim }}"
+    password: "{{ jenkins_admin_password.content | b64decode | trim }}"
     script: |
       import jenkins.model.*
       import hudson.security.*
