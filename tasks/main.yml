@@ -56,7 +56,7 @@
 
 - name: Remove Jenkins Init Directory
   file:
-    path: "{{ {{ jenkins_defaults_file }} }}"
+    path: "{{ jenkins_init_dir }}"
     state: absent
 
 - name: Wait For Jenkins Startup
